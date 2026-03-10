@@ -7,27 +7,6 @@
 
 ---
 
-## 🚀 快速开始
-
-### 5分钟快速上手
-
-1. **查看主文档** - 了解完整功能
-   ```bash
-   cat SKILL.md
-   ```
-
-2. **浏览文档索引** - 定位所需内容
-   ```bash
-   cat CATALOG.md
-   ```
-
-3. **阅读白皮书** - 深入学习架构
-   ```bash
-   ls references/whitepapers/
-   ```
-
----
-
 ## 📚 核心资源
 
 ### 🎯 官方白皮书 (4557行深度内容)
@@ -52,43 +31,81 @@
 
 ---
 
-## 🎯 常见场景
+### **前置准备（必看）**：
 
-### 场景1: 我是新手，想快速了解DolphinDB
-```bash
-# 1. 阅读概述
-cat references/doc_1201.md  # 关于DolphinDB
+1. 确保已安装 DolphinDB 相关环境，具体环境部署可参考 [部署](https://docs.dolphindb.cn/zh/deploy/deploy_intro.html)；
+2. 安装 VS Code 客户端 ；
+3. 安装 GitHub Copilot 和 DolphinDB 扩展，具体 DolphinDB 扩展安装可参考 [VS Code 插件](https://docs.dolphindb.cn/zh/db_distr_comp/vscode.html)；
 
-# 2. 查看数据库白皮书第1章
-head -100 references/whitepapers/database.md
+![](./img/1.png)
+![](./img/2.png)
+4. 克隆本仓库到本地目录：
+| **类型**   | **VSCODE**           | Antigravity                                     | **CLAUDE**          |
+| :--------- | :------------------- | ----------------------------------------------- | :------------------ |
+| 项目 Skill | `.github/skills/`    | <workspace-root>/.agents/skills/<skill-folder>/ | `.claude/skills/`   |
+| 个人 Skill | `~/.copilot/skills/` | ~/.gemini/antigravity/skills/<skill-folder>/    | `~/.claude/skills/` |
+
+保证层级目录为：
+```
+skills/ 
+└── dolphindb_skill/    
+    ├── assets/    
+    ├── ...       
+    └── SKILL.md
 ```
 
-### 场景2: 我要设计生产数据库
-```bash
-# 1. 阅读数据库白皮书
-cat references/whitepapers/database.md
+项目路径：适用于团队协作或特定项目开发，将 DolphinDB Skill 放入当前开发项目根目录下的 `.github/skills/` 文件夹中，仅对当前项目生效，不影响其他项目的 AI 代理配置，方便团队共享统一的 Skill 版本。
 
-# 2. 查看SKILL.md中的代码示例
-grep -A 30 "TSDB存储引擎" SKILL.md
-```
+个人路径：适用于个人日常开发，将 DolphinDB Skill 放入个人用户目录下的 `.copilot/skills/` 文件夹中，全局生效，无论打开哪个 DolphinDB 开发项目，都能调用该 Skill，无需重复配置。
 
-### 场景3: 我要搭建量化回测系统
-```bash
-# 1. 精读回测白皮书
-cat references/whitepapers/backtest.md
+其他 AI Agent 使用 DolphinDB Skill，可以将其配置到对应的目录下，例如配置 Google Antigravity 的Global Skill，可以将其配置到 `~/.gemini/antigravity/skills/<skill-folder>/` 目录下，重启 Google Antigravity 即可直接使用，具体可参考 [Google Antigravity Documentation](https://antigravity.google/docs/skills) 。
 
-# 2. 查看完整回测流程
-grep -A 50 "中高频回测完整流程" SKILL.md
-```
+#### Step 1：配置 DolphinDB Skill
+打开 VS Code，进入 GitHub Copilot 插件设置，找到“Chat: Use Agent Skills”配置项并启用。
+![](./img/3.png)
 
-### 场景4: 我要查特定函数
-```bash
-# 方式1: 使用CATALOG索引
-grep "movingAvg" CATALOG.md
+配置完成后，如果 `/dolphindb` 指令可被正常查找到，则证明 DolphinDB Skill 配置成功。
 
-# 方式2: 直接搜索
-grep -r "movingAvg" references/
-```
+![](./img/4.png)
+
+#### Step 2：3 个高频场景，解锁 AI 辅助开发
+
+温馨提示：以下所有场景的提问前，需添加 `/dolphindb` ，才能成功调用 DolphinDB Skill 
+
+#### **场景 1：自然语言转脚本**
+
+打开 Copilot 聊天视图，输入自然语言指令，比如：
+
+“/dolphindb 帮我写一个创建 TSDB 存储引擎分区表的脚本，采用 VALUE+HASH 组合分区，要求有字段 time, symbol，price，并且生成20条模拟数据，使用 dolphindb 的标准 sql 语句实现”
+
+“/dolphindb 写一个流计算实时 K 线合成的脚本”
+
+Copilot 会生成符合语法规范的完整脚本，可直接复制使用，还能通过内联聊天精准调整。
+
+![](./img/5.png)
+
+#### **场景 2：概念与知识点讲解**
+
+在 Copilot 聊天视图输入提问，比如：
+
+“/dolphindb 解释一下 DolphinDB 的 TSDB 和 OLAP 存储引擎的区别”
+
+“/dolphindb DolphinDB 中时序聚合引擎的用法”
+
+DolphinDB Skill 会结合官方文档内容，用通俗语言拆解知识点+搭配示例，边开发边学习，无需额外查文档。
+![](./img/6.png)
+
+#### 场景 3：调试与优化
+
+生成脚本后，若出现语法报错，可直接在聊天界面提问，快速获取针对性解决方案。
+![](./img/7.png)
+
+### 为什么值得用？
+
+1. 零成本上手：依托 VS Code+Copilot 熟悉操作，简单配置即可使用；
+2. 精准适配：专为 DolphinDB 设计，同步官方文档核心内容；
+3. 效率翻倍：节省语法记忆、调试、查文档时间，新手快速入门，资深开发者提效；
+4. 边学边练：支持知识点讲解，边开发边夯实基础。
 
 ---
 
@@ -137,14 +154,12 @@ grep -r "movingAvg" references/
 ✅ **13个细分类别** - 更精准的文档分类  
 ✅ **版本信息明确** - 标注DolphinDB 3.00.4  
 
-详见: [../OPTIMIZATION_REPORT.md](../OPTIMIZATION_REPORT.md)
-
 ---
 
 ## 📊 目录结构
 
 ```
-dolphindb_skill_optimized/
+dolphindb_skill/
 ├── README.md                    # 本文件 (快速入门)
 ├── SKILL.md                     # 主文档 (详细指南)
 ├── CATALOG.md                   # 文档索引 (1493个文档)
@@ -162,48 +177,11 @@ dolphindb_skill_optimized/
 
 ---
 
-## 🛠️ 使用技巧
-
-### 技巧1: 使用grep快速定位
-```bash
-# 查找包含"分区"的所有文档
-grep -r "分区" references/ | head -20
-
-# 查找特定函数
-grep -r "createTimeSeriesEngine" references/
-```
-
-### 技巧2: 结合CATALOG.md浏览
-```bash
-# 查看所有流数据相关文档
-cat CATALOG.md | grep -A 30 "流数据处理"
-
-# 查看所有SQL函数
-cat CATALOG.md | grep -A 50 "SQL函数"
-```
-
-### 技巧3: 分步学习路径
-```bash
-# 第1天: 快速入门
-cat SKILL.md | head -200
-
-# 第2-3天: 精读白皮书
-cat references/whitepapers/database.md
-
-# 第4-5天: 实战练习
-# (运行SKILL.md中的代码示例)
-
-# 后续: 按需查询
-# (使用CATALOG.md定位)
-```
-
----
-
 ## 🔗 相关资源
 
 - **官网**: https://www.dolphindb.com
 - **文档中心**: https://docs.dolphindb.cn
-- **社区论坛**: https://community.dolphindb.com
+- **社区论坛**: https://ask.dolphindb.cn/
 - **GitHub**: https://github.com/dolphindb
 
 ---
@@ -214,7 +192,7 @@ cat references/whitepapers/database.md
 
 1. 先查阅 [SKILL.md](SKILL.md) 常见问题导航
 2. 使用 [CATALOG.md](CATALOG.md) 搜索相关文档
-3. 访问 [DolphinDB社区](https://community.dolphindb.com)
+3. 访问 [DolphinDB社区](https://ask.dolphindb.cn/)
 4. 联系官方技术支持
 
 ---
