@@ -346,6 +346,53 @@ not (x > 3)       // → false（same）
 | DECIMAL | DECIMAL64(S) | `3.14P` | P | 8 |
 | DECIMAL | DECIMAL128(S) | `3.14$DECIMAL128(3)` | | 16 |
 
+### DECIMAL 精度类型详解
+
+DECIMAL 是 DolphinDB 2.0 新增的精确小数类型，避免浮点精度丢失，适合**财务金额、价格、利率**等需要精确计算的场景。
+
+| 类型 | 精度（S = 小数位数） | 整数部分最大位数 | 字节 |
+|------|-------------------:|:------------:|:----:|
+| `DECIMAL32(S)` | 0–9 | 9-S 位 | 4 |
+| `DECIMAL64(S)` | 0–18 | 18-S 位 | 8 |
+| `DECIMAL128(S)` | 0–38 | 38-S 位 | 16 |
+
+```dolphindb
+// 创建 DECIMAL 标量（三种等价写法）
+a = 3.14$DECIMAL32(2)              // DECIMAL32，保留2位小数
+b = decimal64(3.14, 4)             // DECIMAL64，保留4位小数
+c = 3.141592653589793$DECIMAL128(15)  // DECIMAL128 高精度
+
+// 创建 DECIMAL 向量
+v = [1.1, 2.2, 3.3]$DECIMAL64(2)  // 向量转换
+v2 = decimal32(1.1 2.2 3.3, 2)    // 等价写法
+
+// ⚠️ DECIMAL vs DOUBLE 区别
+0.1 + 0.2              // → 0.30000000000000004（DOUBLE 精度误差）
+0.1$DECIMAL64(1) + 0.2$DECIMAL64(1)  // → 0.3（DECIMAL 精确）
+
+// 查询中使用 DECIMAL
+select decimal64(Price, 4) as Price4 from trades  // 列转换
+select sum(Amount$DECIMAL64(2)) from orders       // 聚合计算
+
+// DECIMAL 建表（推荐财务字段使用）
+CREATE TABLE "dfs://finance".orders (
+    OrderTime  TIMESTAMP,
+    SecID      SYMBOL,
+    Price      DECIMAL64(4),   // 价格精确到4位小数
+    Amount     DECIMAL128(2)   // 金额精确到分
+) ...
+
+// Python API：DECIMAL ↔ Python 类型映射
+// DECIMAL32/64 → Python decimal.Decimal
+// Python decimal.Decimal → DECIMAL（精度由 Python 侧决定）
+// ⚠️ pandas DataFrame 中 DECIMAL 列会转为 object 类型
+```
+
+> **选型建议**：
+> - 价格、因子值：`DECIMAL64(8)` — 足够精度，性能较好
+> - 金额合计：`DECIMAL128(2)` — 避免大数溢出
+> - 一般指标：`DOUBLE` — 精度够用，计算更快
+
 **重要规则：**
 - 整数溢出：采用二进制补码，**最小值 - 1 表示 NULL**（如 INT NULL = -2147483648）
 - SYMBOL 每分区最多 2^21 个不同值；超出会报错

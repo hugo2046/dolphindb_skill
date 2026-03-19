@@ -167,24 +167,69 @@ docker exec -it ddb /bin/bash
 
 ## 高可用（HA）部署
 
-高可用需要至少 3 个控制节点（Raft 协议）
+高可用需要至少 **3 个控制节点**（Raft 协议实现 leader 选举）+ 至少 2 个数据节点（副本冗余）
+
+### 关键配置参数速查
 
 ```ini
-# controller.cfg（高可用）
-localSite=192.168.1.100:8848:controller1
-mode=controller
-dfsReplicationFactor=2
-dataSync=1
-# HA 配置
-raftElectionTick=1000
-raftHeartbeatTick=100
+# ── 副本策略 ──
+dfsReplicationFactor=2       # 数据副本数（生产建议 2）
+dfsReplicaReliabilityLevel=1 # 副本可靠性等级
+                             #   0=同一台机器允许多副本（测试用）
+                             #   1=不同机器各一个副本（生产必须）
+
+# ── 数据同步模式 ──
+dataSync=0   # 弱同步：leader 收到数据即确认（高吞吐，可能丢失最近写入）
+dataSync=1   # 强同步：majority 确认后才返回（强一致，写入延迟略高）
+             # ⚠️ 生产环境建议 dataSync=1
+
+# ── Raft 选举调优（毫秒单位）──
+raftElectionTick=1000     # 选举超时（选举通常 raftElectionTick 内完成）
+raftHeartbeatTick=100     # 心跳间隔，建议 = raftElectionTick / 10
+
+# ── 异步复制（DataNode 到 DataNode）──
+# 写入延迟更低，但 secondary 节点可能短暂落后
+dfsHAMode=Raft            # 控制节点高可用模式（默认 Raft）
 ```
 
+### 3 控制节点集群配置示例
+
 ```ini
-# cluster.nodes（高可用）
+# cluster.nodes（3 个控制节点 + 数据节点）
 192.168.1.100:8848:controller1,controller
 192.168.1.101:8848:controller2,controller
 192.168.1.102:8848:controller3,controller
+192.168.1.103:8850:datanode1,datanode
+192.168.1.104:8851:datanode2,datanode
+```
+
+```ini
+# controller.cfg（每个控制节点配置相同，localSite 各自不同）
+localSite=192.168.1.100:8848:controller1
+mode=controller
+dfsReplicationFactor=2
+dfsReplicaReliabilityLevel=1
+dataSync=1
+raftElectionTick=1000
+raftHeartbeatTick=100
+maxMemSize=8
+logFile=/log/controller.log
+```
+
+### 高可用运维命令
+
+```dolphindb
+// 查看当前 Raft leader
+getRaftEndpoint()
+
+// 查看节点存活状态
+getClusterDFSNodes()
+
+// 查看副本分布情况
+select * from getTabletsMeta() where replicaNum < 2   // 找出副本不足的分区
+
+// 手动触发副本重新均衡
+rebalanceChunksWithinDataNode("datanode1")
 ```
 
 ---

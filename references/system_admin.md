@@ -34,19 +34,74 @@ resetPwd("alice", "newpass")
 
 ### 权限类型速查
 
-| 权限常量 | 说明 |
-|----------|------|
-| TABLE_READ | 读表 |
-| TABLE_WRITE | 写表 |
-| TABLE_UPDATE | 更新表 |
-| TABLE_DELETE | 删除表数据 |
-| DB_READ | 读数据库 |
-| DB_WRITE | 写数据库 |
-| DB_CREATE | 创建数据库 |
-| DB_DELETE | 删除数据库 |
-| SCRIPT_EXEC | 执行脚本 |
-| VIEW_EXEC | 执行视图 |
-| COMPUTE_GROUP_EXEC | 使用计算组 |
+| 权限常量 | 粒度 | 说明 |
+|----------|:----:|------|
+| `TABLE_READ` | 表 | 查询数据 |
+| `TABLE_WRITE` | 表 | append!/insert into |
+| `TABLE_UPDATE` | 表 | update 语句 |
+| `TABLE_DELETE` | 表 | delete 语句 |
+| `TABLE_INSERT` | 表 | insert into（细粒度） |
+| `DB_READ` | 库 | 读该库所有表 |
+| `DB_WRITE` | 库 | 写该库所有表 |
+| `DB_CREATE` | 库 | 在库中建表 |
+| `DB_DELETE` | 库 | 删库/删表 |
+| `DB_MANAGE` | 库 | 库管理（含 DDL） |
+| `SCRIPT_EXEC` | 全局 | 执行任意脚本 |
+| `TEST_EXEC` | 全局 | 执行测试脚本 |
+| `VIEW_EXEC` | 视图 | 执行指定视图 |
+| `FUNCTION_EXEC` | 函数 | 执行指定函数视图 |
+| `COMPUTE_GROUP_EXEC` | 计算组 | 使用计算组 |
+
+### 权限通配符与批量授权
+
+```dolphindb
+// "%" 通配符：授予对所有对象的权限
+grant("alice", TABLE_READ, "%")       // 所有表可读
+grant("alice", DB_WRITE, "%")         // 所有库可写
+
+// 指定单表
+grant("alice", TABLE_READ, "dfs://trade_db/trades")
+
+// 指定整个库（库下所有表）
+grant("alice", DB_READ, "dfs://trade_db")
+
+// 函数视图权限（最小权限原则）
+// 1. 先定义函数视图
+addFunctionView(getTrades)    // 向系统注册函数视图
+// 2. 授予用户执行该视图的权限（用户无需 TABLE_READ）
+grant("alice", VIEW_EXEC, "getTrades")
+
+// 用户组批量管理
+grant("analysts", TABLE_READ, "dfs://trade_db/%")  // 分析员组全部表可读
+revoke("analysts", TABLE_WRITE, "%")               // 撤销所有写权限
+```
+
+### 权限诊断函数
+
+```dolphindb
+// 查看用户已有权限
+getUserAccess("alice")
+
+// 列出所有用户
+getUserList()
+
+// 列出所有用户组
+getGroupList()
+
+// 查看用户组成员
+exec member from getGroupList() where groupID="analysts"
+
+// 查看函数视图列表
+getFunctionViews()
+
+// 测试某用户是否有权限（模拟该用户执行）
+// 用 rpc 以该用户身份执行，观察是否报 Not allowed 错误
+```
+
+> **⚠️ 常见权限报错**：
+> - `Not allowed to read...` → 缺少 `TABLE_READ`，检查 `getUserAccess()`
+> - `No privilege to create...` → 缺少 `DB_CREATE` 或 `DB_MANAGE`
+> - `Permission denied` on script → 缺少 `SCRIPT_EXEC`，考虑改用函数视图
 
 ---
 

@@ -166,6 +166,88 @@ BasicTable bt = new BasicTable(colNames, cols);
 conn.run("trades.append!", Arrays.asList(bt));
 ```
 
+### BatchTableWriter（高性能批量写入）
+
+```java
+import com.xxdb.streaming.client.*;
+
+// 创建 BatchTableWriter（异步批量，推荐高频写入）
+BatchTableWriter writer = new BatchTableWriter(
+    "localhost", 8848, "admin", "123456",
+    true   // enableHighAvailability
+);
+
+// 添加表（dbPath + tableName）
+writer.addTable("dfs://trade_db", "trades");
+
+// 写入一行（类型需与表结构完全匹配）
+writer.insert("dfs://trade_db", "trades",
+    Utils.countMilliseconds(2024, 1, 1, 9, 30, 0, 0),  // TIMESTAMP
+    "000001",   // SYMBOL
+    10.50,      // DOUBLE
+    1000        // INT
+);
+
+// 关闭（等待所有数据写入完成）
+writer.waitForThreadCompletion();
+```
+
+### PartitionedTableAppender（多线程并发写入分区表）
+
+```java
+import com.xxdb.*;
+
+// 适合大批量历史数据导入（多线程并发写不同分区）
+DBConnectionPool pool = new ExclusiveDBConnectionPool(
+    "localhost", 8848, "admin", "123456", 
+    5,     // 线程数（建议 = 分区数 or CPU核数）
+    true,  // loadBalance
+    false  // highAvailability
+);
+
+PartitionedTableAppender appender = new PartitionedTableAppender(
+    "dfs://trade_db",  // dbPath
+    "trades",          // tableName
+    "TradeDate",       // partitionColumnName（分区列）
+    pool
+);
+
+// 批量追加（BasicTable 格式）
+appender.append(bt);
+pool.shutdown();
+```
+
+### Java 侧流数据订阅
+
+```java
+import com.xxdb.streaming.client.*;
+
+// 创建流订阅客户端
+ThreadedClient subscriber = new ThreadedClient("localhost", 8849);
+
+// 消息处理器
+MessageHandler handler = new MessageHandler() {
+    @Override
+    public void doEvent(IMessage msg) {
+        // msg 是一行流数据
+        System.out.println(msg.getEntity(1).getString()); // 第2列值
+    }
+};
+
+// 订阅流表
+subscriber.subscribe(
+    "localhost",  // DolphinDB 节点地址
+    8848,
+    "trades",     // 流表名
+    "javaSub",    // actionName
+    handler,
+    -1            // offset=-1 表示从新增数据开始
+);
+
+// 取消订阅
+subscriber.unsubscribe("localhost", 8848, "trades", "javaSub");
+```
+
 ---
 
 ## C++ API

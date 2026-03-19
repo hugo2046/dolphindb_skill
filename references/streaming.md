@@ -260,4 +260,135 @@ data = table(now()+(1..10)*1000 AS TradeTime,
     rand(150.0, 10) AS Price,
     rand(10000, 10) AS Volume)
 objByName("trades").append!(data)
+
+---
+
+## 历史数据回放（replay / replayDS）
+
+> 将历史分布式表数据按时序"回放"到流表，常用于量化回测和策略调试。
+
+### replay 基础用法
+
+```dolphindb
+// 语法
+replay(inputTables, outputTables, dateColumn, timeColumn,
+       [replayRate=-1], [absoluteRate=true], [parallelLevel=1])
+```
+
+| 参数 | 说明 |
+|------|------|
+| `inputTables` | 数据源表（内存表或分布式表） |
+| `outputTables` | 目标流表（结构必须与输入一致） |
+| `dateColumn` | 日期列名 |
+| `timeColumn` | 时间列名 |
+| `replayRate` | 回放速度：`-1`=极速（无延迟），`1000`=每秒1000条 |
+| `absoluteRate` | `true`=按条数/秒限速，`false`=按时间加速倍率 |
+
+```dolphindb
+// 创建目标流表
+share streamTable(1:0, `TradeDate`TradeTime`SecurityID`Price`Volume,
+    [DATE, TIME, SYMBOL, DOUBLE, INT]) as tickStream
+
+// 加载历史数据
+histData = loadTable("dfs://stock_data", "trades")
+
+// 回放（极速模式）
+replay(
+    inputTables=histData,
+    outputTables=tickStream,
+    dateColumn=`TradeDate,
+    timeColumn=`TradeTime,
+    replayRate=-1        // -1=极速，不等待
+)
+
+// 回放（限速模式，每秒1000条）
+replay(histData, tickStream, `TradeDate, `TradeTime, replayRate=1000)
+```
+
+---
+
+### replayDS 分段回放（大数据推荐）
+
+`replayDS` 将大查询分割为多个数据段（DataSource），避免一次性加载全量数据到内存。
+
+```dolphindb
+// replayDS 语法
+ds = replayDS(
+    sqlObj=<select * from histData where TradeDate=2024.01.01>,
+    dateColumn=`TradeDate,
+    timeColumn=`TradeTime,
+    [timeRepartitionSchema]   // 可选：时间切片方案
+)
+
+// 将 replayDS 结果传给 replay
+replay(
+    inputTables=ds,
+    outputTables=tickStream,
+    dateColumn=`TradeDate,
+    timeColumn=`TradeTime,
+    replayRate=1000
+)
+```
+
+---
+
+### 与回测引擎联动（完整端到端）
+
+```dolphindb
+// ① 清理旧环境（防止重复注册报错）
+try { unsubscribeTable(tableName="tickStream", actionName="backtest") } catch(ex) {}
+try { dropStreamEngine("backtestEngine") } catch(ex) {}
+try { dropStreamTable(`tickStream) } catch(ex) {}
+
+// ② 创建回放流表（结构与历史表一致）
+share streamTable(1:0, `TradeDate`TradeTime`SecurityID`Price`Volume,
+    [DATE, TIME, SYMBOL, DOUBLE, INT]) as tickStream
+
+// ③ 加载历史数据
+histData = loadTable("dfs://stock_data", "trades")
+
+// ④ 创建策略处理引擎（示例：简单统计）
+outputTable = table(1000:0, `SecurityID`TradeTime`Price, [SYMBOL, TIME, DOUBLE])
+engine = createReactiveStateEngine(
+    name="backtestEngine",
+    metrics=<[TradeTime, Price]>,
+    dummyTable=tickStream,
+    outputTable=outputTable,
+    keyColumn=`SecurityID
+)
+
+// ⑤ 订阅流表 → 触发引擎
+subscribeTable(
+    tableName="tickStream",
+    actionName="backtest",
+    handler=engine,
+    msgAsTable=true
+)
+
+// ⑥ 执行回放（按日期切片）
+ds = replayDS(
+    sqlObj=<select * from histData where TradeDate between 2024.01.01 and 2024.01.31>,
+    dateColumn=`TradeDate,
+    timeColumn=`TradeTime
+)
+replay(ds, tickStream, `TradeDate, `TradeTime, replayRate=-1)
+
+// ⑦ 查看结果
+select * from outputTable limit 10
+```
+
+---
+
+### 常用运维函数
+
+```dolphindb
+// 查看回放/订阅状态
+getStreamingStat().pubTables     // 发布表状态
+getStreamingStat().subWorkers    // 订阅消费线程状态
+
+// 清理
+unsubscribeTable(tableName="tickStream", actionName="backtest")
+dropStreamEngine("backtestEngine")
+dropStreamTable(`tickStream)
+```
 ```

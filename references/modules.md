@@ -29,27 +29,60 @@ module status
 ```dolphindb
 use ta
 
-// 移动平均
-ta::ma(close, 5)               // 简单移动平均（SMA）
-ta::ema(close, 12)             // 指数移动平均（EMA）
-ta::dema(close, 12)            // 双指数移动平均
-ta::wma(close, 5)              // 加权移动平均
+// ── 移动平均 ──
+ta::ma(close, 5)                 // 简单移动平均（SMA）
+ta::ema(close, 12)               // 指数移动平均（EMA）
+ta::dema(close, 12)              // 双指数移动平均（DEMA）
+ta::tema(close, 12)              // 三指数移动平均（TEMA）
+ta::wma(close, 5)                // 加权移动平均
+ta::kama(close, 10)              // 考夫曼自适应均线
 
-// 动量指标
-ta::rsi(close, 14)             // RSI
-ta::macd(close, 12, 26, 9)    // MACD（返回 macd/signal/histogram）
-ta::cci(high, low, close, 20)  // CCI
+// ── 动量/震荡指标 ──
+ta::rsi(close, 14)               // RSI（相对强弱指数）
+result = ta::macd(close, 12, 26, 9)
+// result[0]=MACD线，result[1]=信号线，result[2]=柱状图
 
-// 布林带
-result = ta::bBands(close, 20, 2.0)   // 返回 [upper, middle, lower]
+ta::cci(high, low, close, 20)    // 商品通道指数
 
-// 成交量指标
-ta::obv(close, volume)         // OBV
-ta::vwap(price, volume)        // VWAP（成交量加权均价）
+// KDJ（随机指标）
+kdj = ta::kdj(high, low, close, 9, 3, 3)
+// kdj[0]=K，kdj[1]=D，kdj[2]=J
 
-// K 线形态
-ta::doji(open, close, high, low)  // 十字星形态检测
+// Stochastic（慢速随机）
+stoch = ta::stoch(high, low, close, 5, 3, 3)
+// stoch[0]=slowK，stoch[1]=slowD
+
+ta::mom(close, 10)               // 动量（Momentum）
+ta::roc(close, 10)               // 变化率（ROC）
+
+// ── 波动率 ──
+ta::atr(high, low, close, 14)    // 真实波幅（ATR）
+bband = ta::bBands(close, 20, 2.0, 2.0)
+// bband[0]=upper，bband[1]=middle，bband[2]=lower
+
+// ── 趋势 ──
+ta::adx(high, low, close, 14)    // 平均趋向指标
+ta::sar(high, low, 0.02, 0.2)    // 抛物线转向
+
+// ── 成交量指标 ──
+ta::obv(close, volume)           // 能量潮（OBV）
+ta::vwap(price, volume)          // 成交量加权均价（VWAP）
+ta::adosc(high, low, close, volume, 3, 10)  // A/D摆动指标
+
+// ── K 线形态识别 ──
+ta::doji(open, close, high, low)  // 十字星
+ta::hammer(open, close, high, low) // 锤子线
 ```
+
+> **⚠️ 注意**：`ta` 模块函数返回**向量**（与输入等长），适合在 SQL `context by` 中使用：
+> ```dolphindb
+> use ta
+> select SecurityID, TradeTime, close,
+>     ta::ema(close, 12) as ema12,
+>     ta::rsi(close, 14) as rsi14
+> from loadTable("dfs://trade_db", "kline")
+> context by SecurityID
+> ```
 
 ### mytt（My Technical Tools）
 

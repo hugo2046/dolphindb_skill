@@ -148,13 +148,59 @@ t.upsert!(data, ignoreNull=true, keyColNames=`SecurityID`TradeTime)
 INSERT INTO loadTable("dfs://trade_db","trades")
 VALUES (2024.01.01T09:30:00.000, "AAPL", 150.0, 10000)
 
-// loadTextEx（CSV 批量导入）
+// ── CSV 导入 ──────────────────────────────────────────────
+// loadText：导入为内存表（适合小文件）
+t = loadText(
+    filename="/data/trades.csv",
+    [delimiter=","],           // 分隔符（默认逗号）
+    [schema],                  // 自定义 schema 表（见下）
+    [skipRows=0],              // 跳过头部行数
+    [transform]                // 可选数据变换函数
+)
+
+// loadTextEx：直接写入分布式表（推荐大文件）
 loadTextEx(
     dbHandle=database("dfs://trade_db"),
     tableName="trades",
-    partitionColumns=`TradeTime`SecurityID,
-    filename="/data/trades.csv"
+    partitionColumns=`TradeDate`SecurityID,
+    filename="/data/trades.csv",
+    [delimiter=","],
+    [schema],
+    [skipRows=1],              // 跳过标题行
+    [sortColumns=`SecurityID`TradeTime]  // TSDB 时需要
 )
+
+// ── Schema 自定义（解决类型推断错误）──────────────────────
+// 先让系统自动推断一次
+schema = extractTextSchema("/data/trades.csv")
+// 手动修正列类型（修改 type 列）
+update schema set type="SYMBOL" where name="SecurityID"
+update schema set type="TIMESTAMP" where name="TradeTime"
+update schema set type="DOUBLE" where name="Price"
+// 再用修正后的 schema 加载
+loadTextEx(database("dfs://trade_db"), "trades", `TradeDate, "/data/trades.csv", schema=schema)
+
+// ── 常见陷阱 ──────────────────────────────────────────────
+// 1. 编码问题（GBK → UTF-8 转换）
+//    Linux: iconv -f GBK -t UTF-8 input.csv > output.csv
+//    或在 loadText 后手动处理字符串列
+
+// 2. NULL 值处理（CSV 中的空格或特定字符）
+//    默认空字符串被识别为 NULL，如需保留：
+//    update schema set format="%s" where name="StringCol"
+
+// 3. 日期格式（非标准格式需指定 format）
+//    update schema set format="MM/dd/yyyy" where name="TradeDate"
+
+// 4. 跳过表头（若 CSV 第一行是列名）
+//    skipRows=1（不填 schema 时 DolphinDB 会自动把第一行当列名）
+
+// ── 多文件批量导入 ──────────────────────────────────────────
+fileList = files("/data/2024/").filename   // 列出目录下文件
+each(def(f){
+    loadTextEx(database("dfs://trade_db"), "trades",
+               `TradeDate`SecurityID, "/data/2024/" + f)
+}, fileList)
 ```
 
 ---
